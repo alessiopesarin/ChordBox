@@ -36,3 +36,8 @@
 | 2026-04-17 10:56:28 | **HONEST_MASTER** | 1.9127 | 42.65% | (The Honest Seed)
 | 2026-04-17 11:06:07 | **HONEST_MASTER_DEEP** | 2.1126 | 35.90% | (The Honest Seed - Deep Version)
 | 2026-04-17 11:47:17 | **MASTER_DEEP_ADAM** | 1.8156 | 51.43% | (Recovered Master - Adam)
+| 2026-04-17 12:36:14 | **SUPER_MASTER_DEEP** | 1.5793 | 54.19% | (Super Master - BB+GS)
+| 2026-04-17 12:53:01 | **SUPER_MASTER_DEEP_BALANCED** | B:1.85/G:1.17 | B:52.25%/G:56.69% | (Super Master Balanced)
+| 2026-04-17 15:42:19 | **STUDENT_ENHANCED_GEN_6** | 1.4754 | 57.95% | (Hybrid Ensemble Cycle)
+| 2026-04-17 16:47:37 | **STUDENT_ENHANCED_GEN_7_ELITE** | 1.4894 | 56.14% | (Hybrid Ensemble Cycle)
+| 2026-04-17 17:11:53 | **STUDENT_ENHANCED_GEN_8_REFINEMENT** | 1.5331 | 54.21% | (Hybrid Ensemble Cycle)
