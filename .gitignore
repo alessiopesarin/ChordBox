@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Project Data (Very Large)
+data/
+data/raw/billboard/audio/
+data/raw/guitarset/audio/
+data/raw/youtube_audio/
+data/processed/billboard/
+data/processed/guitarset/
+data/processed/youtube/
+data/processed/mert/
+temp_audio/
+
+# Metadata - CSVs with many links are kept, but local cache is ignored
+*.pt
+*.lab
+*.jams
+*.wav
+*.mp3
+
+# Models
+models/*.pth
+models/*.pt
+
+# Weights & Biases
+wandb/
+
+# Editor/OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+EVOLUTION_LOG.md
+
+# Legacy Code
+legacy/
+notes/

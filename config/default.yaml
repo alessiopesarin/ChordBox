@@ -1,0 +1,30 @@
+# Deep Chord Project - Configuration
+
+training:
+  epochs: 40
+  batch_size: 16
+  learning_rate: 0.0001
+  model_dir: "./models"
+  base_model_name: "enhanced_resnet_attention"
+  use_wandb: true
+  project_name: "deep-chord-acr"
+
+model:
+  num_classes: 25
+  lstm_hidden: 256
+  lstm_layers: 2
+  attention_heads: 4
+  dropout: 0.4
+
+data:
+  sr: 22050
+  hop_length: 512
+  chunk_frames: 430
+  metadata_csv: "data/raw/metadata/cocopops_links_extended.csv"
+  audio_dir: "data/raw/billboard/audio"
+  annotations_dir: "data/raw/billboard/annotations/Billboard/Resources/McGill_Data/MirexFiles"
+  billboard_features_dir: "data/processed/billboard"
+  guitarset_features_dir: "data/processed/guitarset"
+  guitarset_annotations_dir: "data/raw/guitarset/annotation"
+  pseudo_csv_path: "data/processed/youtube/youtube_pseudo_labels.csv"
+  youtube_features_dir: "data/processed/youtube"

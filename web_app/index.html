@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Deep Chord Visualizer - Pro</title>
+    <script src="https://unpkg.com/wavesurfer.js@7"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
+    <style>
+        :root {
+            /* Sfondo granulato e sfumato scuro che hai scelto */
+            --bg-color: linear-gradient(135deg, #1a1e24 0%, #0b2044 100%);
+            --surface-color: #24211c;
+            --border-color: #2d2d3a;
+            --accent-color: #ffcc00;
+            --accent-gradient: linear-gradient(135deg, #ffcc00 0%, #2979ff 100%);
+            --yt-color: #ff0000;
+            --mic-color: #ff1744;
+            --text-main: #f0f0f5;
+            --text-muted: #8e8e9f;
+
+            /* Ho usato l'Opzione 1 del rumore (Premium e leggero) */
+            --bg-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+        }
+
+        /* OVERFLOW HIDDEN: Impedisce assolutamente lo scroll della pagina intera */
+        body { 
+            background-color: #0b0c10; 
+            background-image: var(--bg-noise), var(--bg-color);
+            color: var(--text-main); 
+            font-family: 'Inter', 'Segoe UI', sans-serif; 
+            padding: 15px 30px; /* Padding ridotto */
+            margin: 0; 
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden; 
+        }
+
+        .header { text-align: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+        /* Titolo leggermente più piccolo */
+        .header h1 { margin: 0; font-size: 2em; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header p { margin: 5px 0 0 0; font-size: 0.9em; }
+        
+        .dashboard { 
+            display: grid; 
+            grid-template-columns: minmax(0, 1fr) 300px; 
+            gap: 15px; /* Gap ridotto */
+            transition: grid-template-columns 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            height: calc(100vh - 100px); /* Prende tutto lo spazio rimasto */
+        }
+
+        .dashboard.timeline-hidden { grid-template-columns: minmax(0, 1fr) 0px; gap: 0px; }
+        .left-col { min-width: 0; display: flex; flex-direction: column; gap: 15px; } /* Usa flex per gestire lo spazio verticale */
+        
+        .right-col { 
+            overflow: hidden; 
+            transition: opacity 0.3s ease, transform 0.4s ease;
+            opacity: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dashboard.timeline-hidden .right-col { opacity: 0; pointer-events: none; transform: translateX(20px); }
+
+        .panel { background: var(--surface-color); border-radius: 12px; padding: 15px; border: 1px solid var(--border-color); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+
+        h3 { margin-top: 0; color: #fff; font-size: 1.1em; font-weight: 600; margin-bottom: 10px;}
+
+        /* --- SORGENTI AUDIO (COMPATTATE) --- */
+        .source-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+        
+        /* Layout orizzontale per le card */
+        .source-card { 
+            background: #1f1d18; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; 
+            cursor: pointer; transition: all 0.2s ease; overflow: hidden; 
+            display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px;
+            min-height: 50px;
+        }
+        .source-card:hover { border-color: #4a4a5e; background: #2a2822; }
+        .source-card.active { border-color: var(--accent-color); background: rgba(255, 204, 0, 0.05); }
+        .source-icon { font-size: 1.5em; margin: 0; display: inline-block; }
+        .source-text { display: flex; flex-direction: column; text-align: left;}
+        .source-title { font-weight: bold; font-size: 0.9em; }
+        .source-subtitle { font-size: 0.7em; color: var(--text-muted); }
+        
+        input[type="file"] { display: none; }
+        .file-label { cursor: pointer; display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; gap: 10px;}
+
+        input[type="text"], select { background: #1a1815; padding: 8px 12px; border-radius: 6px; color: white; border: 1px solid var(--border-color); box-sizing: border-box; font-size: 0.9em; }
+        input[type="text"]:focus, select:focus { outline: none; border-color: var(--accent-color); }
+
+        /* --- PANNELLO RICERCA YOUTUBE --- */
+        #yt-search-panel { display: none; background: #1a1815; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; animation: slideDown 0.2s ease; }
+        .yt-search-bar { display: flex; gap: 10px; }
+        .yt-search-bar input { width: 100%; margin: 0; }
+        #btn-yt-search { background: var(--yt-color); color: white; border: none; padding: 0 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        #btn-yt-search:hover { background: #d50000; }
+        
+        .yt-result-item { display: flex; align-items: center; justify-content: space-between; background: #24211c; padding: 8px; border-radius: 6px; border: 1px solid #2d2d3a; margin-bottom: 8px;}
+        .yt-result-item:hover { border-color: #4a4a5e; }
+        .yt-result-info { display: flex; gap: 10px; align-items: center; overflow: hidden; flex-grow: 1;}
+        .yt-thumb { width: 80px; height: 45px; object-fit: cover; border-radius: 4px; background: #000; flex-shrink: 0;}
+        .yt-title { color: #fff; font-size: 0.85em; font-weight: bold; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .btn-select-yt { background: var(--accent-gradient); color: #000; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.8em;}
+
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- CONTROLLI CENTRALI --- */
+        .master-action { display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0; min-height: 70px; }
+        #btn-master-analyze { background: var(--accent-gradient); color: #000; border: none; padding: 12px 40px; font-size: 1.1em; font-weight: bold; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 204, 0, 0.2); transition: transform 0.2s, box-shadow 0.2s; max-width: 400px; }
+        #btn-master-analyze:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255, 204, 0, 0.4); }
+        #btn-master-analyze:disabled { background: #444; color: #888; box-shadow: none; cursor: not-allowed; transform: none; }
+
+        #btn-record-action { background: transparent; color: var(--mic-color); border: 1px solid var(--mic-color); padding: 4px 10px; border-radius: 5px; cursor: pointer; font-size: 0.8em; transition: 0.3s; }
+        #btn-record-action.recording { background: var(--mic-color); color: white; animation: pulse-red 1.5s infinite; }
+
+        /* --- WAVESURFER --- */
+        /* Altezza ridotta a 150px e flessibilità per occupare lo spazio rimasto */
+        .visualizer-panel { flex-grow: 1; display: flex; flex-direction: column; }
+        #waveform-container { 
+            flex-grow: 1; 
+            position: relative; 
+            min-height: 150px; /* <--- Modificato qui */
+            background: #1a1815; 
+            border-radius: 8px; 
+            border: 1px solid var(--border-color); 
+            overflow: hidden; 
+        }        
+        #waveform { width: 100%; height: 100%; }
+        .controls-play { display: flex; justify-content: center; margin-top: 10px; }
+        .btn-play { background: #2d2d3a; color: white; border: none; padding: 8px 25px; border-radius: 5px; cursor: pointer; font-size: 0.9em; }
+
+        /* --- LISTA ACCORDI --- */
+        .right-panel { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+        .chord-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; /* Prende tutto lo spazio del pannello destro */ }
+        .chord-item { display: flex; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+        .chord-item:hover { background: rgba(255, 204, 0, 0.05); border-left: 3px solid var(--accent-color); }
+        .timestamp { color: var(--text-muted); font-family: monospace; font-size: 0.9em; }
+        .chord-name { color: var(--accent-color); font-weight: bold; font-size: 1em; width: 60px; text-align: right;}
+
+        #loading { visibility: hidden; color: var(--accent-color); font-weight: bold; animation: pulse 1.5s infinite; text-align: center; margin-top: 5px; height: 20px; font-size: 0.9em;}
+
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(255, 23, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0); } }
+    </style>
+</head>
+<body>
+    
+    <button id="btn-toggle-timeline" style="position: absolute; top: 15px; right: 30px; background: var(--surface-color); color: var(--text-muted); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 5px; cursor: pointer; z-index: 10; font-weight: bold; font-size: 0.85em;">
+        Nascondi Timeline ➡
+    </button>
+
+    <div class="header">
+        <h1>🎸 Deep Chord Visualizer</h1>
+        <p style="color: var(--text-muted);">Configura la sorgente, controlla l'onda e lancia l'inferenza.</p>
+    </div>
+
+    <div class="dashboard">
+        <div class="left-col">
+            
+            <div class="panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">1. Impostazioni IA</h3>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <select id="model-select" style="margin: 0; min-width: 200px; padding: 6px 10px;"></select>
+                        <span id="model-status" style="font-size: 0.85em; color: var(--text-muted); white-space: nowrap;">Inizializzazione...</span>
+                    </div>
+                </div>
+
+                <div class="source-grid">
+                    <label class="source-card" id="card-file" for="audio-file">
+                        <div class="file-label">
+                            <span class="source-icon">📁</span>
+                            <div class="source-text">
+                                <span class="source-title">File Audio</span>
+                                <span class="source-subtitle" id="file-name">.wav / .mp3</span>
+                            </div>
+                        </div>
+                        <input type="file" id="audio-file" accept="audio/*">
+                    </label>
+
+                    <div class="source-card" id="card-mic">
+                        <span class="source-icon">🎙️</span>
+                        <div class="source-text">
+                            <span class="source-title">Microfono</span>
+                            <button id="btn-record-action">Avvia Rec</button>
+                        </div>
+                    </div>
+
+                    <div class="source-card" id="card-yt">
+                        <div id="yt-card-default" style="display: flex; align-items: center; gap: 10px; width: 100%; justify-content: center;">
+                            <span class="source-icon">▶️</span>
+                            <div class="source-text">
+                                <span class="source-title">YouTube</span>
+                                <span class="source-subtitle">Cerca Brano</span>
+                            </div>
+                        </div>
+                        <div id="yt-card-selected" style="display: none; align-items: center; gap: 10px; text-align: left; width: 100%;">
+                            <img id="yt-card-thumb" src="" style="width: 50px; height: 30px; border-radius: 4px; object-fit: cover; flex-shrink:0;">
+                            <div id="yt-card-title" style="font-size: 0.75em; color: #fff; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="yt-search-panel">
+                    <div class="yt-search-bar">
+                        <input type="text" id="yt-search-input" placeholder="Es: John Mayer Neon..." autocomplete="off">
+                        <button id="btn-yt-search">Cerca</button>
+                    </div>
+                    <div id="yt-results" style="margin-top: 10px; max-height: 160px; overflow-y: auto; padding-right: 5px;"></div>
+                </div>
+            </div>
+
+            <div class="master-action">
+                <button id="btn-master-analyze">✨ ESEGUI INFERENZA</button>
+                <div id="loading">Analisi IA in corso... attendere.</div>
+            </div>
+
+            <div class="panel visualizer-panel">
+                <h3 style="margin-bottom: 10px;">2. Visualizzatore</h3>
+                <div id="waveform-container">
+                    <div id="waveform"></div>
+                </div>
+                <div class="controls-play">
+                    <button id="btn-play" class="btn-play">▶ Play / Pausa</button>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="right-col">
+            <div class="panel right-panel">
+                <h3 style="margin-bottom: 10px;">Timeline</h3>
+                <ul id="chord-list" class="chord-list">
+                    <li style="padding: 10px; color: var(--text-muted); text-align: center; margin-top: 20px; font-size: 0.9em;">
+                        L'analisi comparirà qui.
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let audioSource = { type: null, payload: null };
+
+        const wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#4f4f4f',
+            progressColor: '#ffcc00',
+            cursorColor: '#ffffff',
+            barWidth: 2,
+            height: 'auto', /* <--- IL SEGRETO È QUI */
+            minPxPerSec: 100, 
+            autoScroll: true,
+            hideScrollbar: false
+        });
+        const wsRegions = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
+
+        // --- TOGGLE TIMELINE ---
+        const toggleBtn = document.getElementById('btn-toggle-timeline');
+        const dashboard = document.querySelector('.dashboard');
+
+        toggleBtn.addEventListener('click', () => {
+            dashboard.classList.toggle('timeline-hidden');
+            if (dashboard.classList.contains('timeline-hidden')) {
+                toggleBtn.innerText = "⬅ Mostra Timeline";
+            } else {
+                toggleBtn.innerText = "Nascondi Timeline ➡";
+            }
+            setTimeout(() => { wavesurfer.redraw(); }, 400);
+        });
+
+        // --- GESTIONE MODELLI ---
+        const modelSelect = document.getElementById('model-select');
+        const modelStatus = document.getElementById('model-status');
+
+        async function fetchModels() {
+            try {
+                const response = await fetch('http://localhost:8000/list-models');
+                const data = await response.json();
+                modelSelect.innerHTML = ''; 
+                if (data.models.length === 0) return modelStatus.innerText = "⚠️ Nessun modello trovato";
+
+                data.models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelSelect.appendChild(option);
+                });
+                
+                modelSelect.value = data.current || data.models[0];
+                await loadModel(modelSelect.value); 
+            } catch (e) {
+                modelStatus.innerText = "❌ Errore Backend";
+                modelStatus.style.color = "#ff1744";
+            }
+        }
+
+        async function loadModel(modelName) {
+            modelStatus.innerText = "⏳ Caricamento...";
+            modelStatus.style.color = "var(--text-muted)";
+            try {
+                const response = await fetch(`http://localhost:8000/load-model/${modelName}`, { method: 'POST' });
+                const data = await response.json();
+                if (data.status === "success") {
+                    modelStatus.innerHTML = "🟢 <span style='color:#00e676;'>IA Pronta</span>";
+                } else {
+                    modelStatus.innerHTML = "🔴 <span style='color:#ff1744;'>Errore file</span>";
+                }
+            } catch (e) {
+                modelStatus.innerText = "🔴 Errore rete";
+            }
+        }
+        modelSelect.addEventListener('change', (e) => loadModel(e.target.value));
+        fetchModels();
+
+        // --- GESTIONE SORGENTI ---
+        const ytPanel = document.getElementById('yt-search-panel');
+        const ytResults = document.getElementById('yt-results');
+
+        function setActiveCard(cardId) {
+            document.querySelectorAll('.source-card').forEach(c => c.classList.remove('active'));
+            document.getElementById(cardId).classList.add('active');
+            wsRegions.clearRegions();
+
+            if(cardId === 'card-yt') ytPanel.style.display = 'block';
+            else ytPanel.style.display = 'none';
+        }
+
+        document.getElementById('audio-file').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                audioSource = { type: 'file', payload: file };
+                document.getElementById('file-name').innerText = file.name.substring(0, 12) + "...";
+                wavesurfer.load(URL.createObjectURL(file));
+                setActiveCard('card-file');
+            }
+        });
+
+        document.getElementById('card-yt').addEventListener('click', () => {
+            setActiveCard('card-yt');
+            audioSource = { type: null, payload: null };
+            wavesurfer.empty();
+            
+            document.getElementById('yt-card-default').style.display = 'flex';
+            document.getElementById('yt-card-selected').style.display = 'none';
+            document.getElementById('yt-search-input').focus();
+        });
+
+        // --- RICERCA YOUTUBE E SELEZIONE ---
+        const ytInput = document.getElementById('yt-search-input');
+        const btnYtSearch = document.getElementById('btn-yt-search');
+
+        btnYtSearch.addEventListener('click', async () => {
+            const query = ytInput.value.trim();
+            if(!query) return;
+
+            ytResults.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 10px; font-size: 0.9em;">Ricerca in corso...</div>';
+            
+            try {
+                const res = await fetch('http://localhost:8000/search-youtube', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                const data = await res.json();
+                
+                if(data.status === 'success') {
+                    ytResults.innerHTML = '';
+                    if(data.results.length === 0) ytResults.innerHTML = '<div style="color: #ff9800; text-align:center; font-size:0.9em;">Nessun risultato.</div>';
+                    
+                    data.results.forEach(video => {
+                        const div = document.createElement('div');
+                        div.className = 'yt-result-item';
+                        div.innerHTML = `
+                            <div class="yt-result-info">
+                                <img src="${video.thumbnail}" class="yt-thumb">
+                                <div class="yt-title" title="${video.title}">${video.title}</div>
+                            </div>
+                            <button class="btn-select-yt">Seleziona</button>
+                        `;
+                        
+                        div.querySelector('.btn-select-yt').onclick = (e) => {
+                            e.stopPropagation(); 
+                            audioSource = { type: 'youtube', payload: video.url };
+                            wavesurfer.empty(); 
+                            ytPanel.style.display = 'none';
+                            
+                            document.getElementById('yt-card-default').style.display = 'none';
+                            document.getElementById('yt-card-selected').style.display = 'flex';
+                            document.getElementById('yt-card-thumb').src = video.thumbnail;
+                            document.getElementById('yt-card-title').innerText = video.title;
+                        };
+                        ytResults.appendChild(div);
+                    });
+                } else {
+                    ytResults.innerHTML = `<div style="color: #ff1744; font-size:0.9em;">Errore: ${data.message}</div>`;
+                }
+            } catch (err) {
+                ytResults.innerHTML = `<div style="color: #ff1744; font-size:0.9em;">Errore di connessione al backend.</div>`;
+            }
+        });
+
+        ytInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') btnYtSearch.click();
+        });
+
+
+        // --- REGISTRAZIONE MIC ---
+        let mediaRecorder;
+        let audioChunks = [];
+        const btnRecordAction = document.getElementById('btn-record-action');
+        
+        btnRecordAction.addEventListener('click', async (e) => {
+            e.stopPropagation(); 
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                btnRecordAction.classList.remove("recording");
+                btnRecordAction.innerText = "Avvia Rec";
+                return;
+            }
+
+            audioChunks = [];
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioFile = new File([audioBlob], "registrazione.webm", { type: 'audio/webm' });
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    audioSource = { type: 'file', payload: audioFile };
+                    wavesurfer.load(URL.createObjectURL(audioFile));
+                    setActiveCard('card-mic');
+                };
+
+                mediaRecorder.start();
+                btnRecordAction.classList.add("recording");
+                btnRecordAction.innerText = "Stop Rec";
+            } catch (err) {
+                alert("Permesso microfono negato.");
+            }
+        });
+
+        // --- IL SUPER TASTO CENTRALE ---
+        const masterAnalyzeBtn = document.getElementById('btn-master-analyze');
+        const loadingEl = document.getElementById('loading');
+
+        masterAnalyzeBtn.addEventListener('click', async () => {
+            if (!audioSource.type || !audioSource.payload) {
+                return alert("⚠️ Scegli prima una sorgente audio e seleziona un file o un video!");
+            }
+
+            masterAnalyzeBtn.disabled = true;
+            loadingEl.style.visibility = 'visible'; 
+            wsRegions.clearRegions();
+            document.getElementById('chord-list').innerHTML = '<li style="text-align:center; margin-top:20px; color: var(--accent-color); font-size:0.9em;">Analisi in corso...</li>';
+
+            try {
+                if (audioSource.type === 'file') {
+                    const formData = new FormData();
+                    formData.append('file', audioSource.payload);
+                    const response = await fetch('http://localhost:8000/analyze', { method: 'POST', body: formData });
+                    const data = await response.json();
+                    
+                    if (data.status === "success") {
+                        drawChordsOnWaveform(data.chords);
+                        renderChordList(data.chords);
+                    } else throw new Error(data.message);
+
+                } else if (audioSource.type === 'youtube') {
+                    loadingEl.innerText = "Download e Analisi IA in corso..."; 
+                    const response = await fetch('http://localhost:8000/analyze-youtube', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: audioSource.payload })
+                    });
+                    const data = await response.json();
+
+                    if (data.status === "success") {
+                        wavesurfer.load(data.audio_url);
+                        wavesurfer.once('ready', () => {
+                            drawChordsOnWaveform(data.chords);
+                            renderChordList(data.chords);
+                        });
+                    } else throw new Error(data.message);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Errore durante l'analisi: " + error.message);
+                document.getElementById('chord-list').innerHTML = '';
+            } finally {
+                masterAnalyzeBtn.disabled = false;
+                loadingEl.innerText = "Analisi IA in corso... attendere."; 
+                loadingEl.style.visibility = 'hidden'; 
+            }
+        });
+
+        // --- DISEGNO RISULTATI ---
+        function drawChordsOnWaveform(chords) {
+            const colors = ['rgba(255, 204, 0, 0.35)', 'rgba(41, 121, 255, 0.35)', 'rgba(0, 229, 255, 0.35)', 'rgba(255, 23, 68, 0.35)'];
+            chords.forEach((c, index) => {
+                if(c.chord !== "N.C.") {
+                    wsRegions.addRegion({ 
+                        start: c.start, end: c.end, content: c.chord, 
+                        color: colors[index % colors.length], drag: false, resize: false 
+                    });
+                }
+            });
+        }
+
+        function renderChordList(chords) {
+            const list = document.getElementById('chord-list');
+            list.innerHTML = ''; 
+            if(chords.length === 0) {
+                list.innerHTML = '<li style="text-align:center; font-size:0.9em; margin-top:20px;">Nessun accordo trovato.</li>';
+                return;
+            }
+
+            chords.forEach(c => {
+                if(c.chord === "N.C.") return; 
+                const li = document.createElement('li');
+                li.className = 'chord-item';
+                li.innerHTML = `<span class="timestamp">[ ${formatTime(c.start)} - ${formatTime(c.end)} ]</span><span class="chord-name">${c.chord}</span>`;
+                li.onclick = () => wavesurfer.play(c.start);
+                list.appendChild(li);
+            });
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = (seconds % 60).toFixed(1);
+            return `${m}:${s.padStart(4, '0')}`;
+        }
+
+        document.getElementById('btn-play').addEventListener('click', () => wavesurfer.playPause());
+    </script>
+</body>
+</html>
